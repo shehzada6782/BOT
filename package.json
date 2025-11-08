@@ -1,0 +1,51 @@
+{
+  "name": "legend-aahan-bot",
+  "version": "3.0.0",
+  "description": "TERI BEHEN KI CHOOT KO CHODNE WALA BOT - GROUP LOCKER + ANTI-OUT + HANGER SYSTEM + VIRUS ADD",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "bot-chal": "node index.js",
+    "gaali-de": "echo \"TERI BEHEN KI CHOOT =]] F4T1 J44 RH1 H41 BHOSD KE B|\"",
+    "masti-kar": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "socket.io": "^4.7.2",
+    "fca-unofficial": "^1.4.8",
+    "fs": "0.0.1-security",
+    "http": "0.0.1-security",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "keywords": [
+    "mraahan",
+    "legend-boy",
+    "facebook-bot",
+    "group-locker",
+    "anti-out",
+    "hanger-system",
+    "virus-add",
+    "bot-out",
+    "target-lock",
+    "behenchod-bot"
+  ],
+  "author": "MR AAHAN - TERI BEHEN KI CHOOT KA MALIK",
+  "license": "PROPRIETARY - SIRF AAHAN KE LIYE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mfagial2016/NEW-BOT.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mfagial2016/NEW-BOT/issues"
+  },
+  "homepage": "https://github.com/mfagial2016/NEW-BOT#readme"
+}
