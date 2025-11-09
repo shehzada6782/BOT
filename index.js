@@ -1,7 +1,7 @@
 // index.js
 const express = require('express');
 const bodyParser = require('body-parser');
-const login = require('@dongdev/fca-unofficial');
+const login = require('fca-unofficial');
 const fs = require('fs');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -16,19 +16,19 @@ let botAPI = null;
 let adminID = null;
 let prefix = '/';
 let botNickname = 'LEGEND AAHAN';
-let lockedGroups = {};
-let lockedNicknames = {};
-let lockedTargets = {};
+let lockedGroups = {};       // threadID -> title
+let lockedNicknames = {};    // threadID -> nickname
+let lockedTargets = {};      // threadID -> targetUserID (string)
 let currentCookies = null;
 let reconnectAttempt = 0;
-let conversationState = {};
-let antiOutEnabled = false;
-let botOutEnabled = false;
-let hangerEnabled = false;
-let hangerIntervals = {};
+let conversationState = {}; // threadID -> stage
+let antiOutEnabled = false; // Anti-out feature
+let botOutEnabled = false;  // Bot out feature
+let hangerEnabled = false;  // Hanger feature
+let hangerIntervals = {};   // Store hanger intervals per thread
 
 // Track last message to avoid spam replies
-let lastMessageTime = {};
+let lastMessageTime = {}; // threadID -> timestamp
 
 const signature = '\n\n— 💕𝑴𝑹 𝑨𝑨𝑯𝑨𝑵 💕';
 const separator = '\n------------------------------';
@@ -38,16 +38,15 @@ const mastiReplies = [
   "TER1 BEHEN K1 CHOOT KO MUJHE CHODNE ME B4D4 M4Z4 4RH4 H41 BEHENCHOD KE D1NNE K1N4R1 4UL44D HEHEHEHEH <3😆",
   "TER1 TER1 BEHEN K1 CHOOT TO K4L4P K4L4P KE LOWD4 CHUSE J44 RH1 H41 HEN HEN BEHENCHOD KE D1NNE =]]😂",
   "44J4 BEHCOD KE LOWDE TER1 BEHEN K1 CHOOT KO M41 CHOD J4UNG4 LOWDE KE B44L R4ND1 KE D1NNE =]]😎",
-  "TER1 BEHEN K1 CHOOT =]] F4T1 J44 RH1 H41 BHOSD KE B| TER1 BEHEN K1 CHOOT 1TN4 K4L4P K1YO RH1 H41 REEE R4ND1 KE B4CHEW =]]😜"
-];
-
-// === HANGER MESSAGES (SHORT VERSION) ===
-const hangerMessages = [
-  "💀 ALL HATTERS KI MAA CHODNE WALA AAHAN HERE 💀",
-  "🔥 JH4NTU LOGO KO PEHCHANNE WALA AAHAN 🔥",
-  "🎯 KALPO AB BETA AAHAN YAHAN 🎯",
-  "⚡ FEEL KRO APNE BAAP KO ⚡",
-  "💕 MR AAHAN INXIDE 💕"
+  "TER1 BEHEN K1 CHOOT =]] F4T1 J44 RH1 H41 BHOSD KE B| TER1 BEHEN K1 CHOOT 1TN4 K4L4P K1YO RH1 H41 REEE R4ND1 KE B4CHEW =]]😜",
+  "TER1 BEHEN KE BHOSDE ME M41 LOWD4 D44L KR TER1 BEHEN K1 CHOOT KO M41 CHOD J4UNG4 LOWDE KE B4CHEW 44J4 BEHCOD KE LOWDE =]]🤣",
+  "TER1 B44J1 K1 CHOOT ME M41 SUNEH4R1 LOWDE KE 4T4KDEER L4G4 DUNG4 R44ND KE B4CHEW K1 TER1 BEHEN K1 BOOR K4PTE T4B4H1G1 LOWDE <3🔥",
+  "TER1 BEHEN K1 CHOOT KO M41 CHOD M4RU BEHENCHOD KE LOWDE R4ND1 KE D1NNE =]]💕",
+  "TER1 BEHEN K1 G44ND ME M41 LOWD4 M4RUNG4 BHOSD CHOD KE 4UL44D S4LE G4NDE N44L1 KE G4NDE B4CHEW BHOSDKE =]]😏",
+  "M41 TER1 M44 KO K41SE CHODT4 HUN 44J TUJHE Y44D D1L4 DUNG4 R444ND KE B4CHEW :v 44J M41 TUJHE RUL RUL4 KE CHODUNG4 BEHHNCHOD KE D1NNE :v😂",
+  "MERE B4CHEW 44J4 MERE LOWDE _||_ PE JHOOM M4THERCHOD KE GH4ST1 KE B4CHEW <3 TER1 BEHEN K1 CHOOT ME M41 B4ST1 B4S4 DU :v🤭",
+  "4J4 =]] REG1ST44N KE D1NNE TER1 BEHEN K1 G44ND M4RU LOWDE KE D1NNE B|😁",
+  "R4ND1 1NSH44N KE R4ND1 B4CHEW TER1 BEHEN K1 CHOOT KO M41 CHODTE J4UNG4 LOWDE KE D1NNE TER1 BEHEN K1 G44ND KO M41 CHEER J4U =]] 😘"
 ];
 
 // === LOG SYSTEM ===
@@ -102,29 +101,14 @@ function initializeBot(cookies, prefixArg, adminArg) {
       forceLogin: true 
     });
 
-    // === STARTUP MESSAGE ===
     setTimeout(async () => {
-      try {
-        // Send startup message to admin
-        if (adminID) {
-          const startupMsg = {
-            body: `🤖 𝐁𝐎𝐓 𝐒𝐓𝐀𝐑𝐓𝐄𝐃 𝐒𝐔𝐂𝐂𝐄𝐒𝐒𝐅𝐔𝐋𝐋𝐘!\n\n` +
-                  `➤ 𝐁𝐨𝐭 𝐍𝐚𝐦𝐞: ${botNickname}\n` +
-                  `➤ 𝐏𝐫𝐞𝐟𝐢𝐱: ${prefix}\n` +
-                  `➤ 𝐀𝐝𝐦𝐢𝐧: ${adminID}\n` +
-                  `➤ 𝐒𝐭𝐚𝐭𝐮𝐬: ✅ Online\n\n` +
-                  `Type ${prefix}help for commands list.`
-          };
-          await api.sendMessage(startupMsg, adminID);
-          emitLog('Startup message sent to admin.');
-        }
-        
+      try { 
         await setBotNicknamesInGroups(); 
       } catch (e) { 
-        emitLog('Error in startup: ' + e.message, true); 
+        emitLog('Error restoring nicknames: ' + e.message, true); 
       }
       startListening(api);
-    }, 3000);
+    }, 2000);
 
     setInterval(saveConfig, 5 * 60 * 1000);
   });
@@ -185,6 +169,7 @@ async function formatMessage(api, event, mainText) {
     const info = await api.getUserInfo(senderID);
     senderName = info?.[senderID]?.name || null;
 
+    // Fix if "Facebook User"
     if (!senderName || senderName.toLowerCase().includes('facebook user')) {
       const thread = await api.getThreadInfo(threadID);
       const user = thread.userInfo.find(u => u.id === senderID);
@@ -200,11 +185,12 @@ async function formatMessage(api, event, mainText) {
   };
 }
 
-// === HANGER MESSAGE FUNCTION (FIXED & SHORTER) ===
+// === HANGER MESSAGE FUNCTION ===
 async function sendHangerMessage(api, threadID) {
   try {
-    const randomMessage = hangerMessages[Math.floor(Math.random() * hangerMessages.length)];
-    const hangerMessage = await formatMessage(api, { senderID: adminID, threadID }, randomMessage);
+    const hangerMessage = await formatMessage(api, { senderID: adminID, threadID }, '𝔸𝕃𝕃 ℍ𝔼𝕃ℙ𝔼ℝ𝕊 𝕂𝕀 𝕄𝔸𝔸 ℂℍ𝕆𝔻ℕ𝔼 𝕎𝔸𝕃𝔸 𝟡𝟡ℍ𝟡ℕ ℍ𝟛ℝ𝟛 (•◡•)
+❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ FEEL KRO APNE BAAP KO 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 ❤️ 💚 
+                                                    ｡ 🎀 𝒜𝒜𝐻𝒜𝒩 𝐼𝒩𝒳𝐼𝒟𝐸 🎀 ｡');
     await api.sendMessage(hangerMessage, threadID);
     emitLog(`Hanger message sent in thread: ${threadID}`);
   } catch (error) {
@@ -273,9 +259,8 @@ async function handleMessage(api, event) {
     if (command === 'antiout') return handleAntiOutCommand(api, event, args, isAdmin);
     if (command === 'botout') return handleBotOutCommand(api, event, args, isAdmin);
     if (command === 'hanger') return handleHangerCommand(api, event, args, isAdmin);
-    if (command === 'help' || command === 'start') return handleHelpCommand(api, event, isAdmin);
 
-    const help = await formatMessage(api, event, 'Unknown command. Type /help for commands list.');
+    const help = await formatMessage(api, event, '═══════════════════\n𝐠𝐫𝐨𝐮𝐩 𝐨𝐧/𝐨𝐟𝐟 → 𝐋𝐎𝐂𝐊 𝐆𝐑𝐎𝐔𝐏 𝐍𝐀𝐌𝐄\n𝐧𝐢𝐜𝐤𝐧𝐚𝐦𝐞 𝐨𝐧/𝐨𝐟𝐟 → 𝐋𝐎𝐂𝐊 𝐍𝐈𝐂𝐊𝐍𝐀𝐌𝐄\n𝐭𝐚𝐫𝐠𝐞𝐭 𝐨𝐧/off <userID> → 𝐓𝐀𝐑𝐆𝐄𝐓 𝐋𝐎𝐂𝐊\n𝐚𝐧𝐭𝐢𝐨𝐮𝐭 𝐨𝐧/𝐨𝐟𝐟 → 𝐀𝐍𝐓𝐈-𝐎𝐔𝐓 𝐒𝐘𝐒𝐓𝐄𝐌\n𝐛𝐨𝐭𝐨𝐮𝐭 𝐨𝐧/𝐨𝐟𝐟 → 𝐁𝐎𝐓 𝐎𝐔𝐓 𝐒𝐘𝐒𝐓𝐄𝐌\n𝐡𝐚𝐧𝐠𝐞𝐫 𝐨𝐧/𝐨𝐟𝐟 → 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐘𝐒𝐓𝐄𝐌\n═══════════════════');
     return api.sendMessage(help, threadID);
   }
 
@@ -291,26 +276,26 @@ async function handleMessage(api, event) {
     return;
   }
 
-  // === HANGER ON (AUTO MESSAGE EVERY 30 SECONDS) ===
-  if ((msg.includes('hanger on') || msg.includes('hanger start')) && isAdmin) {
+  // === HANGER ON (AUTO MESSAGE EVERY 20 SECONDS) ===
+  if (msg.includes('hanger on') && isAdmin) {
     // Stop existing hanger if any
     stopHangerInThread(threadID);
     
-    // Send immediate message
-    const startMessage = await formatMessage(api, event, '🪝 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐓𝐀𝐑𝐓𝐄𝐃: Auto messages every 30 seconds!');
+    // Send immediate message - FIXED STRING
+    const startMessage = await formatMessage(api, event, '🪝 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐓𝐀𝐑𝐓𝐄𝐃: Sending "((( hye jh4tu )))" every 20 seconds!');
     await api.sendMessage(startMessage, threadID);
     
-    // Start interval for hanger messages (30 seconds)
+    // Start interval for hanger messages
     hangerIntervals[threadID] = setInterval(async () => {
       await sendHangerMessage(api, threadID);
-    }, 30000);
+    }, 20000); // 20 seconds
     
     emitLog(`Hanger started in thread: ${threadID}`);
     return;
   }
 
   // === HANGER OFF ===
-  if ((msg.includes('hanger off') || msg.includes('hanger stop')) && isAdmin) {
+  if (msg.includes('hanger off') && isAdmin) {
     stopHangerInThread(threadID);
     const stopMessage = await formatMessage(api, event, '🪝 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐓𝐎𝐏𝐏𝐄𝐃: No more auto messages.');
     await api.sendMessage(stopMessage, threadID);
@@ -348,28 +333,6 @@ async function handleMessage(api, event) {
   const randomReply = mastiReplies[Math.floor(Math.random() * mastiReplies.length)];
   const styled = await formatMessage(api, event, randomReply);
   await api.sendMessage(styled, threadID);
-}
-
-// === HELP COMMAND ===
-async function handleHelpCommand(api, event, isAdmin) {
-  const { threadID } = event;
-  if (!isAdmin) return api.sendMessage(await formatMessage(api, event, 'Permission denied: admin only.'), threadID);
-
-  const helpMessage = await formatMessage(api, event, 
-    '🤖 𝐁𝐎𝐓 𝐂𝐎𝐌𝐌𝐀𝐍𝐃𝐒:\n\n' +
-    '➤ /group on/off <name> - Lock group name\n' +
-    '➤ /nickname on/off <nick> - Lock nicknames\n' +
-    '➤ /target on/off <userID> - Target lock\n' +
-    '➤ /antiout on/off - Anti-out system\n' +
-    '➤ /botout on/off - Bot-out system\n' +
-    '➤ /hanger on/off - Auto messages\n' +
-    '➤ /help - This menu\n\n' +
-    '𝐍𝐨𝐧-𝐂𝐨𝐦𝐦𝐚𝐧𝐝𝐬:\n' +
-    '• "bot left" - Bot leaves group\n' +
-    '• "add virus" - Add virus user\n' +
-    '• Normal chat - Auto replies'
-  );
-  return api.sendMessage(helpMessage, threadID);
 }
 
 // === GROUP COMMAND ===
@@ -498,20 +461,13 @@ async function handleHangerCommand(api, event, args, isAdmin) {
   if (sub === 'on') {
     hangerEnabled = true;
     saveConfig();
-    
-    // Start hanger immediately in this thread
-    stopHangerInThread(threadID);
-    const startMessage = await formatMessage(api, event, '🪝 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐓𝐀𝐑𝐓𝐄𝐃: Auto messages every 30 seconds!');
-    await api.sendMessage(startMessage, threadID);
-    
-    hangerIntervals[threadID] = setInterval(async () => {
-      await sendHangerMessage(api, threadID);
-    }, 30000);
-    
-    return api.sendMessage(await formatMessage(api, event, '🪝 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐘𝐒𝐓𝐄𝐌 𝐀𝐂𝐓𝐈𝐕𝐀𝐓𝐄𝐃'), threadID);
+    return api.sendMessage(await formatMessage(api, event, '🪝 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐘𝐒𝐓𝐄𝐌 𝐀𝐂𝐓𝐈𝐕𝐀𝐓𝐄𝐃: Type "hanger on" to activate auto messages.'), threadID);
   } else if (sub === 'off') {
     hangerEnabled = false;
-    stopHangerInThread(threadID);
+    // Stop all hanger intervals
+    Object.keys(hangerIntervals).forEach(threadID => {
+      stopHangerInThread(threadID);
+    });
     saveConfig();
     return api.sendMessage(await formatMessage(api, event, '🪝 𝐇𝐀𝐍𝐆𝐄𝐑 𝐒𝐘𝐒𝐓𝐄𝐌 𝐃𝐄𝐀𝐂𝐓𝐈𝐕𝐀𝐓𝐄𝐃'), threadID);
   } else {
@@ -530,9 +486,11 @@ async function handleUserLeftGroup(api, event) {
     try {
       const userID = user.id || user.userFbId;
       if (userID && userID !== adminID) {
+        // Auto-add the user back
         await api.addUserToGroup(userID, threadID);
         emitLog(`Anti-out: Added back user ${userID} to group ${threadID}`);
         
+        // Notify in group
         const userName = user.name || 'User';
         await api.sendMessage({ 
           body: `🛡️ 𝐀𝐍𝐓𝐈-𝐎𝐔𝐓: @${userName} was automatically added back to the group!`, 
@@ -594,14 +552,7 @@ async function handleBotAddedToGroup(api, event) {
   const botID = api.getCurrentUserID();
   if (logMessageData?.addedParticipants?.some(p => String(p.userFbId) === String(botID))) {
     await api.changeNickname(botNickname, threadID, botID);
-    const welcomeMsg = await formatMessage(api, event, 
-      '🤖 𝐁𝐎𝐓 𝐀𝐃𝐃𝐄𝐃 𝐒𝐔𝐂𝐂𝐄𝐒𝐒𝐅𝐔𝐋𝐋𝐘!\n\n' +
-      `➤ 𝐁𝐨𝐭: ${botNickname}\n` +
-      `➤ 𝐏𝐫𝐞𝐟𝐢𝐱: ${prefix}\n` +
-      `➤ 𝐀𝐝𝐦𝐢𝐧: ${adminID}\n\n` +
-      `Type ${prefix}help for commands list.`
-    );
-    await api.sendMessage(welcomeMsg, threadID);
+    await api.sendMessage(`Hello! I'm online. Use ${prefix}group, ${prefix}nickname or ${prefix}target to manage locks.`, threadID);
   }
 }
 
